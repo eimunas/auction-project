@@ -1,0 +1,27 @@
+###
+### Retrieve a token that can be used for calls requiring authentication
+###
+POST http://localhost:3000/tokens
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "admin@example.com",
+  "password": "adminpassword"
+}
+
+> {%
+client.global.set("token", "m1jnH3l3L4ng3en5uperV31l!geT0ken");
+%}
+
+
+###
+### Invalidate the token
+###
+@port = variable value
+@host = variable value
+@protocol = variable value
+DELETE http://localhost:3000/tokens
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{token}}

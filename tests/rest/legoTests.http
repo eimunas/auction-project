@@ -1,0 +1,229 @@
+### Get list of legos
+GET http://localhost:3000/legos
+
+> {%
+    client.test("Fetch all legos", function () {
+        // Check if status is 200
+        client.assert(response.status === 200, "Expected status 200, got " + response.status);
+        client.assert(response.body.filteredLegos.length > 0, "Expected at least one lego set in the list, got ");
+
+    });
+%}
+
+### Get specific lego by ID
+GET http://localhost:3000/legos/testing-id-for-lego
+Content-Type: application/json
+
+> {%
+    client.test("Fetch specific lego", function () {
+        client.assert(response.status === 200, "Expected status 200, got " + response.status);
+        client.assert(response.body.name.length > 0, "Lego name should not be empty");
+        client.assert(response.body.price > 0, "Lego price should be a positive value");
+    });
+%}
+
+### Authorize token so user would be able to post lego
+POST http://localhost:3000/tokens
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "adminpassword"
+}
+> {%
+    client.test("Login successful, token received", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.global.set("token", response.body.token);
+    });
+%}
+
+### Add a new lego (Admin required)
+POST http://localhost:3000/legos
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "LEGO® Haunted House",
+  "price": 199.99,
+  "deadline": "2024-12-31",
+  "interestTheme": "horror",
+  "url": "https://example.com/hauntedhouse.png"
+}
+
+> {%
+    client.test("Add a new lego (Admin)", function () {
+        client.assert(response.status === 201, "Expected status 201 for successful creation, got " + response.status);
+    });
+%}
+
+### Create Lego (Unauthorized)
+POST http://localhost:3000/legos
+Content-Type: application/json
+
+{
+  "name": "Unauthorized Lego"
+}
+
+> {%
+    client.test("Unauthorized creation attempt", function() {
+        client.assert(response.status === 401, "Expected 401 Unauthorized");
+    });
+%}
+
+### Place Bid on Lego
+POST http://localhost:3000/legos/testing-id-for-lego-online/bids
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "amount": 150.00
+}
+
+> {%
+    client.test("Bid placed successfully", function() {
+        client.assert(response.status === 201, "Failed to place bid");
+    });
+%}
+
+### Place Bid (Expired)
+POST http://localhost:3000/legos/testing-id-for-lego/bids
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "amount": 150
+}
+
+> {%
+    client.test("Bid on expired Lego failed", function() {
+        client.assert(response.status === 400, "Expected 400 Bad Request for expired Lego");
+    });
+%}
+
+### Place Bid (With bad data)
+POST http://localhost:3000/legos
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "",
+  "price": -100,
+  "pieces": "not-a-number"
+}
+
+> {%
+    client.test("Failed to add Lego with incorrect data", function() {
+        client.assert(response.status === 400, "Expected 400 Bad Request");
+    });
+%}
+
+### Update lego
+PUT http://localhost:3000/legos/testing-id-for-lego
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Updated LEGO Set",
+  "price": 200.00
+}
+
+> {%
+    client.test("LEGO item updated successfully", function() {
+        client.assert(response.status === 200, "Failed to update LEGO item");
+    });
+%}
+
+### Update lego with bad data
+PUT http://localhost:3000/legos/testing-id-for-lego
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": 12345,
+  "price": "fifty",
+  "pieces": -10
+}
+
+> {%
+    client.test("Failed to update Lego with incorrect data", function() {
+        client.assert(response.status === 400, "Expected 400 Bad Request");
+    });
+%}
+
+### Delete Lego (Admin Only)
+DELETE http://localhost:3000/legos/testing-id-for-lego-online
+Authorization: Bearer {{token}}
+
+> {%
+client.test("Lego deleted successfully", function() {
+    client.assert(response.status === 204, "Failed to delete Lego");
+});
+%}
+
+
+### Search for auctions by name
+GET http://localhost:3000/legos?searchText=bat
+
+> {%
+    client.test("Search for lego by name", function () {
+        client.assert(response.status === 200, "Expected status 200, got " + response.status);
+
+        const results = response.body.filteredLegos;
+        client.assert(results.length > 0, "Expected at least one result for 'bat'.");
+        client.assert(results.every(lego => lego.name.toLowerCase().includes('bat')),
+            "All results should include the word 'bat' in the name.");
+    });
+%}
+
+### Filter auctions by attributes
+GET http://localhost:3000/legos?selectedThemes=fantasy,ninja&selectedPriceRanges=0-100
+
+> {%
+    client.test("Filter legos by theme and price range", function () {
+        client.assert(response.status === 200, "Expected status 200, got " + response.status);
+
+        const results = response.body.filteredLegos;
+        client.assert(results.length > 0, "Expected at least one result.");
+
+        results.forEach(lego => {
+            const themeValid = ['fantasy', 'ninja'].includes(lego.interestTheme);
+            const priceValid = lego.price >= 0 && lego.price <= 100;
+            client.assert(themeValid && priceValid,
+                "Lego doesn't match the filter criteria.");
+        });
+    });
+%}
+
+#### Real-time bid updates
+#POST http://localhost:3000/legos/testing-id-for-lego2/bids
+#Content-Type: application/json
+#Authorization: Bearer {{token}}
+#
+#{
+#  "userID": "test-id",
+#  "amount": 60.00
+#}
+#
+#> {%
+#    const token = client.global.get("token");  // Ensure token retrieval
+#    console.log("Using token: ", token);       // Verify it's correct
+#
+#    client.test("Real-time bid update", function () {
+#        client.assert(response.status === 201, "Expected status 201, got " + response.status);
+#
+#        fetch("http://localhost:3000/legos/testing-id-for-lego2/bids")
+#            .then(res => res.json())
+#            .then(data => {
+#                const latestBid = data[0];
+#
+#                client.assert(latestBid.amount === 60.00, "Latest bid amount should be 60.00.");
+#                client.assert(latestBid.userID === "test-id", "The bid should belong to the correct user.");
+#            })
+#            .catch(err => client.assert(false, "Error fetching bids: " + err));
+#    });
+#%}
+
+
+
+
+

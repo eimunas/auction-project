@@ -1,0 +1,78 @@
+### User Registration (Success)
+POST http://localhost:3000/users
+Content-Type: application/json
+
+{
+  "name": "New User",
+  "email": "newuser@example.com",
+  "password": "password123"
+}
+> {%
+    client.test("User registered successfully", function() {
+        client.assert(response.status === 201, "Failed to register user");
+    });
+%}
+
+### User Registration (Email Already Exists)
+POST http://localhost:3000/users
+Content-Type: application/json
+
+{
+  "name": "Duplicate User",
+  "email": "newuser@example.com",
+  "password": "password123"
+}
+> {%
+    client.test("Email already exists", function() {
+        client.assert(response.status === 403, "Expected 403 Forbidden");
+    });
+%}
+
+### User Login (Success)
+POST http://localhost:3000/tokens
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "adminpassword"
+}
+> {%
+    client.test("Login successful, token received", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.global.set("token", response.body.token);
+    });
+%}
+
+### User Login (Invalid Credentials)
+POST http://localhost:3000/tokens
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "password": "wrongpassword"
+}
+> {%
+    client.test("Invalid login attempt", function() {
+        client.assert(response.status === 400, "Expected 400 Bad Request");
+    });
+%}
+
+### Get User Wins
+GET http://localhost:3000/users/test-id/wins
+Authorization: Bearer {{token}}
+
+> {%
+client.test("Fetched user wins", function() {
+    client.assert(response.status === 200, "Failed to fetch wins");
+});
+%}
+
+### Get Specific User
+GET http://localhost:3000/users/test-id
+Authorization: Bearer {{token}}
+
+> {%
+client.test("Fetched all users", function() {
+    client.assert(response.status === 200, "Failed to fetch users");
+});
+%}
